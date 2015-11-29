@@ -171,24 +171,8 @@ int main(int argc, char **argv) {
 	secure_vt(&vt);
 
 	while (!auth) {
-		as = &root;
+		as = &user;
 		flush_vt(&vt);
-		if (!only_root) {
-			tty_echo_on(&vt);
-			while (1) {
-				prompt(vt.ios, "\nUnlock as [%s/%s]: ", user.name, root.name);
-				if (!*buf || !strcmp(buf, user.name)) {
-					as = &user;
-					break;
-				} else if (!strcmp(buf, root.name)) {
-					break;
-				}
-			}
-			tty_echo_off(&vt);
-		} else {
-			prompt(vt.ios, "\nPress [Enter] to unlock.\n");
-		}
-
 		prompt(vt.ios, "%s's password: ", as->name);
 		auth = authenticate(as, buf);
 		memset(buf, 0, sizeof(buf));
