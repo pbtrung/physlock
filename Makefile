@@ -1,6 +1,6 @@
 all: physlock
 
-VERSION = 0.4.5
+VERSION = 0.1
 
 CC      = gcc
 PREFIX  = /usr/local
