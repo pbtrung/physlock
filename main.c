@@ -177,7 +177,7 @@ int main(int argc, char **argv) {
 		auth = authenticate(as, buf);
 		memset(buf, 0, sizeof(buf));
 		if (!auth) {
-			fprintf(vt.ios, "\nAuthentication failed\n");
+			fprintf(vt.ios, "\nAuthentication failed\n\n");
 			sleep(AUTH_FAIL_TIMEOUT);
 		}
 	}
