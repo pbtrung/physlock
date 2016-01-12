@@ -90,7 +90,7 @@ void prompt(FILE *stream, const char *fmt, ...) {
 }
 
 int main(int argc, char **argv) {
-	int unauth = 1, user_only = 1;
+	int unauth = 1;
 	userinfo_t root, user, *u = &user;
 
 	oldvt = oldsysrq = oldprintk = vt.nr = vt.fd = -1;
@@ -125,8 +125,6 @@ int main(int argc, char **argv) {
 	if (authenticate(&user, "") == -1)
 		error(EXIT_FAILURE, 0, "Error hashing password for user %s", user.name);
 	get_root(&root);
-	if (strcmp(user.name, root.name) != 0 && authenticate(&root, "") != -1)
-		user_only = 0;
 
 	atexit(cleanup);
 
