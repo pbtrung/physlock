@@ -26,8 +26,8 @@ typedef struct userinfo_s {
 	const char *pwhash;
 } userinfo_t;
 
-void get_uname(userinfo_t*, uid_t);
-void get_pwhash(userinfo_t*);
+void get_user(userinfo_t*, int);
+void get_root(userinfo_t*);
 int authenticate(const userinfo_t*, const char*);
 
 #endif /* AUTH_H */

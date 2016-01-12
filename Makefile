@@ -1,21 +1,29 @@
+VERSION  := 0.5
+
+CC       ?= gcc
+PREFIX   := /usr/local
+CFLAGS   += -Wall -pedantic
+CPPFLAGS += -DVERSION=\"$(VERSION)\" -D_XOPEN_SOURCE=500
+LDFLAGS  +=
+LIBS     := -lcrypt
+
+.PHONY: clean install uninstall
+
+SRC := auth.c main.c options.c util.c vt.c
+DEP := $(SRC:.c=.d)
+OBJ := $(SRC:.c=.o)
+
 all: physlock
 
-VERSION = 0.1
+$(OBJ): Makefile
 
-CC      = gcc
-PREFIX  = /usr/local
-CFLAGS  = -Wall -pedantic -DVERSION=\"$(VERSION)\"
-LDFLAGS =
-LIBS    = -lcrypt
+-include $(DEP)
 
-SRC = auth.c main.c options.c util.c vt.c
-OBJ = $(SRC:.c=.o)
-
-physlock:	$(OBJ)
+physlock: $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
-.c.o: Makefile
-	$(CC) $(CFLAGS) -c -o $@ $<
+%.o: %.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -MMD -MP -c -o $@ $<
 
 install: all
 	install -D -m 4755 -o root -g root physlock $(DESTDIR)$(PREFIX)/bin/physlock
@@ -24,7 +32,7 @@ install: all
 	chmod 644 $(DESTDIR)$(PREFIX)/share/man/man1/physlock.1
 
 clean:
-	rm -f physlock $(OBJ)
+	rm -f physlock $(DEP) $(OBJ)
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/physlock

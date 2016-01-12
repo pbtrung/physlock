@@ -7,6 +7,11 @@ suspend and can therefore only be used with some limitations.
 physlock is designed to be more lightweight, it does not have a plugin
 interface and it is not started using a shell script wrapper.
 
+physlock relies on the utmp file to contain an entry for the active console
+whose `ut_line` field is set to its device name, i.e. "tty1". Some graphical
+login managers do not write such entries per default. You have to manually set
+up `sessreg(1)` in order to use physlock with such a login manager.
+
 Installation
 ------------
 physlock is built using the commands:
@@ -16,12 +21,12 @@ physlock is built using the commands:
 
 Please note, that the latter one requires root privileges.
 By default, physlock is installed using the prefix "/usr/local", so the full
-path of the executable will be "/usr/local/sbin/physlock".
+path of the executable will be "/usr/local/bin/physlock".
 
 You can install it into a directory of your choice by changing the second
 command to:
 
-    # PREFIX="/your/dir" make install
+    # make PREFIX="/your/dir" install
 
 Please also note, that the physlock executable will have root ownership and the
 setuid bit set.
@@ -33,8 +38,8 @@ Usage
 -----
 The behaviour of physlock is completely controlled via command-line arguments,
 it does not rely on environment variables.
-It always allows unlocking as root and as a specified user. If no username is
-given on the command line, then physlock uses the name of the calling user.
+physlock uses the utmp file to identify the owner of the current session (i.e.
+active tty) and prompts for her password to unlock the computer.
 
 The following command-line arguments are supported:
 
@@ -43,5 +48,6 @@ The following command-line arguments are supported:
     -h       print short usage help and exit
     -l       only lock console switching
     -L       only enable console switching
-    -u USER  allow the given user to unlock the computer
+    -m       mute kernel messages on console while physlock is running
+    -s       disable sysrq key while physlock is running
     -v       print version information and exit

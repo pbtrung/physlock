@@ -1,5 +1,5 @@
 /* physlock: auth.c
- * Copyright (c) 2013 Bert Muennich <be.muennich at gmail.com>
+ * Copyright (c) 2013,2015 Bert Muennich <be.muennich at gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -16,61 +16,88 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#define _POSIX_C_SOURCE 200112L
-#define _XOPEN_SOURCE   500 /* for crypt() and strdup() */
-
+#include <paths.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <shadow.h>
 #include <pwd.h>
 #include <unistd.h>
+#include <utmp.h>
 #include <errno.h>
 
 #include "auth.h"
 #include "util.h"
 
-void get_uname(userinfo_t *uinfo, uid_t uid) {
-	struct passwd *pw;
-
-	if (uinfo == NULL)
-		return;
-
-	pw = getpwuid(uid);
-	if (pw == NULL)
-		die("could not get user info for uid %u\n", uid);
-	
-	uinfo->name = strdup(pw->pw_name);
-	if (uinfo->name == NULL)
-		die("could not allocate memory");
-}
-
-void get_pwhash(userinfo_t *uinfo) {
+static void get_pw(userinfo_t *uinfo) {
 	struct spwd *spw;
-
-	if (uinfo == NULL || uinfo->name == NULL)
-		return;
 
 	setspent();
 
 	spw = getspnam(uinfo->name);
 	if (spw == NULL)
-		die("could not get password hash of user %s", uinfo->name);
+		error(EXIT_FAILURE, 0, "No password hash for user %s found", uinfo->name);
 
-	uinfo->pwhash = strdup(spw->sp_pwdp);
-	if (uinfo->pwhash == NULL)
-		die("could not allocate memory");
+	uinfo->pwhash = estrdup(spw->sp_pwdp);
 
 	endspent();
 }
 
+void get_user(userinfo_t *uinfo, int vt) {
+	FILE *uf;
+	struct utmp r;
+	char tty[16], name[UT_NAMESIZE+1];
+
+	while ((uf = fopen(_PATH_UTMP, "r")) == NULL && errno == EINTR);
+	if (uf == NULL)
+		error(EXIT_FAILURE, errno, "%s", _PATH_UTMP);
+
+	uinfo->name = NULL;
+	snprintf(tty, sizeof(tty), "tty%d", vt);
+
+	while (!feof(uf) && !ferror(uf)) {
+		if (fread(&r, sizeof(r), 1, uf) != 1)
+			continue;
+		if (r.ut_type != USER_PROCESS || r.ut_user[0] == '\0')
+			continue;
+		if (strcmp(r.ut_line, tty) == 0) {
+			strncpy(name, r.ut_user, UT_NAMESIZE);
+			name[UT_NAMESIZE] = '\0';
+			uinfo->name = estrdup(name);
+			break;
+		}
+	}
+	fclose(uf);
+
+	if (uinfo->name == NULL)
+		error(EXIT_FAILURE, 0, "%s: No entry for %s found", _PATH_UTMP, tty);
+
+	get_pw(uinfo);
+}
+
+void get_root(userinfo_t *uinfo) {
+	struct passwd *pw;
+
+	while (errno = 0, (pw = getpwuid(0)) == NULL && errno == EINTR);
+	if (pw == NULL)
+		error(EXIT_FAILURE, 0, "No password file entry for uid 0 found");
+
+	uinfo->name = estrdup(pw->pw_name);
+
+	get_pw(uinfo);
+}
+
+/* return value:
+ *   0: authentication successful
+ *   1: authentication failed
+ *  -1: error
+ */
 int authenticate(const userinfo_t *uinfo, const char *pw) {
 	char *cryptpw;
 
-	if (uinfo == NULL || uinfo->pwhash == NULL || pw == NULL)
-		return 0;
-
 	cryptpw = crypt(pw, uinfo->pwhash);
 	if (cryptpw == NULL)
-		die("could not hash password for user %s", uinfo->name);
+		return -1;
 
-	return strcmp(cryptpw, uinfo->pwhash) == 0;
+	return strcmp(cryptpw, uinfo->pwhash) != 0;
 }

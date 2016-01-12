@@ -16,8 +16,6 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#define _POSIX_C_SOURCE 200112L
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -25,81 +23,110 @@
 
 #include "util.h"
 
-enum { BUFLEN = 32 };
+const char *progname;
 
-void cleanup();
+void error(int eval, int err, const char* fmt, ...)
+{
+	va_list ap;
 
-void warn(const char *fmt, ...) {
-	va_list args;
+	fflush(stdout);
+	fprintf(stderr, "%s: ", progname);
+	va_start(ap, fmt);
+	if (fmt != NULL)
+		vfprintf(stderr, fmt, ap);
+	va_end(ap);
+	if (err != 0)
+		fprintf(stderr, "%s%s", fmt != NULL ? ": " : "", strerror(err));
+	fputc('\n', stderr);
 
-	if (!fmt)
-		return;
-
-	va_start(args, fmt);
-	fprintf(stderr, "physlock: warning: ");
-	vfprintf(stderr, fmt, args);
-	fprintf(stderr, "\n");
-	va_end(args);
+	if (eval != 0)
+		exit(eval);
 }
 
-void die(const char *fmt, ...) {
-	va_list args;
+char* estrdup(const char *s) {
+	char *d;
+	size_t n = strlen(s) + 1;
 
-	if (!fmt)
-		return;
-
-	va_start(args, fmt);
-	fprintf(stderr, "physlock: error: ");
-	vfprintf(stderr, fmt, args);
-	fprintf(stderr, "\n");
-	va_end(args);
-
-	cleanup();
-	exit(1);
+	d = malloc(n);
+	if (d == NULL)
+		error(EXIT_FAILURE, errno, NULL);
+	memcpy(d, s, n);
+	return d;
 }
 
-int get_sysrq_state(const char *path) {
-	char buf[BUFLEN], *end;
-	int len, state;
+/*
+ * Read a file to a buffer.
+ * The buffer is ensured to be NULL-terminated.
+ * The call always succeeds (it dies() on failure).
+ * Returns the number of characters read.
+ */
+size_t read_file(const char *path, char *buf, size_t len) {
 	FILE *ctl_file;
+	size_t nread;
 
-	if (!path)
+	while ((ctl_file = fopen(path, "r")) == NULL && errno == EINTR);
+	if (ctl_file == NULL)
+		error(EXIT_FAILURE, errno, "%s", path);
+
+	nread = fread(buf, 1, len - 1, ctl_file);
+	if (ferror(ctl_file))
+		error(EXIT_FAILURE, 0, "%s: Error reading file", path);
+
+	fclose(ctl_file);
+	buf[nread] = '\0';
+
+	return nread;
+}
+
+/*
+ * Write a buffer into a file.
+ * Returns the number of characters written or -1 on failure.
+ */
+CLEANUP ssize_t write_file(const char *path, char *buf, size_t len) {
+	FILE *ctl_file;
+	size_t nwritten;
+
+	while ((ctl_file = fopen(path, "w+")) == NULL && errno == EINTR);
+	if (ctl_file == NULL) {
+		error(0, errno, "%s", path);
 		return -1;
+	}
 
-	ctl_file = fopen(path, "r");
-	if (ctl_file == NULL)
-		die("could not open file: %s", path);
-
-	len = fread(buf, 1, BUFLEN - 1, ctl_file);
-	if (ferror(ctl_file))
-		die("could not read file: %s: %s", path, strerror(errno));
-
+	nwritten = fwrite(buf, 1, len, ctl_file);
+	if (ferror(ctl_file)) {
+		error(0, 0, "%s: Error writing file", path);
+		return -1;
+	}
 	fclose(ctl_file);
 
-	buf[len] = '\0';
-	state = strtol(buf, &end, 0);
-	if (*end && *end != '\n')
-		die("invalid file content: %s: %s", path, buf);
-
-	return state;
+	return nwritten;
 }
 
-void set_sysrq_state(const char *path, int new_state) {
-	char buf[BUFLEN];
-	FILE *ctl_file;
+/*
+ * Read integer from file, and ensure the next character is as expected.
+ * The call always succeeds (it dies() on failure).
+ */
+int read_int_from_file(const char *path, char ending_char) {
+	char buf[32], *end;
+	int value;
 
-	if (!path)
-		return;
+	read_file(path, buf, sizeof(buf));
 
-	ctl_file = fopen(path, "w+");
-	if (ctl_file == NULL)
-		die("could not open file: %s", path);
+	value = strtol(buf, &end, 0);
+	if (*end && *end != ending_char)
+		error(EXIT_FAILURE, 0, "%s: Invalid file content", path);
 
-	snprintf(buf, BUFLEN, "%d\n", new_state);
-
-	fwrite(buf, 1, strlen(buf), ctl_file);
-	if (ferror(ctl_file))
-		die("could not write file: %s: %s", path, strerror(errno));
-
-	fclose(ctl_file);
+	return value;
 }
+
+/*
+ * Write integer to file.
+ * Returns the number of characters written or -1 on failure.
+ */
+CLEANUP ssize_t write_int_to_file(const char *path, int value) {
+	char buf[32];
+
+	snprintf(buf, sizeof(buf), "%d\n", value);
+	return write_file(path, buf, strlen(buf));
+}
+

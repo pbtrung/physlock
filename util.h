@@ -20,11 +20,17 @@
 #define UTIL_H
 
 #include <stdarg.h>
+#include <sys/types.h>
 
-void warn(const char*, ...);
-void die(const char*, ...);
+#define CLEANUP
 
-int get_sysrq_state(const char*);
-void set_sysrq_state(const char*, int);
+extern const char *progname;
+
+void error(int, int, const char*, ...);
+
+char* estrdup(const char*);
+
+int read_int_from_file(const char*, char);
+CLEANUP ssize_t write_int_to_file(const char*, int);
 
 #endif /* UTIL_H */

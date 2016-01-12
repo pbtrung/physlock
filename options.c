@@ -16,19 +16,19 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#define _POSIX_C_SOURCE 200112L
-
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "options.h"
+#include "util.h"
 
 static options_t _options;
 const options_t *options = (const options_t*) &_options;
 
 void print_usage() {
-	printf("usage: physlock [-dhLlsv] [-u user]\n");
+	printf("usage: physlock [-dhLlmsv]\n");
 }
 
 void print_version() {
@@ -38,13 +38,15 @@ void print_version() {
 void parse_options(int argc, char **argv) {
 	int opt;
 	
+	progname = strrchr(argv[0], '/');
+	progname = progname != NULL ? progname + 1 : argv[0];
+
 	_options.detach = 0;
 	_options.disable_sysrq = 0;
-	_options.only_lock = 0;
-	_options.only_unlock = 0;
-	_options.user = NULL;
+	_options.lock_switch = -1;
+	_options.mute_kernel_messages = 0;
 
-	while ((opt = getopt(argc, argv, "dhLlsu:v")) != -1) {
+	while ((opt = getopt(argc, argv, "dhLlmsv")) != -1) {
 		switch (opt) {
 			case '?':
 				print_usage();
@@ -56,15 +58,16 @@ void parse_options(int argc, char **argv) {
 				print_usage();
 				exit(0);
 			case 'L':
-				_options.only_unlock = 1;
+				_options.lock_switch = 0;
 				break;
 			case 'l':
-				_options.only_lock = 1;
+				_options.lock_switch = 1;
+				break;
+			case 'm':
+				_options.mute_kernel_messages = 1;
 				break;
 			case 's':
 				_options.disable_sysrq = 1;
-			case 'u':
-				_options.user = optarg;
 				break;
 			case 'v':
 				print_version();

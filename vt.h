@@ -22,6 +22,8 @@
 #include <stdio.h>
 #include <termios.h>
 
+#define CLEANUP
+
 typedef struct vt_s {
 	int nr;
 	FILE *ios;
@@ -31,20 +33,17 @@ typedef struct vt_s {
 } vt_t;
 
 void vt_init();
-void vt_destroy();
+CLEANUP void vt_destroy();
 
-void get_current_vt(int*);
-void acquire_new_vt(vt_t*);
-void reopen_vt(vt_t*);
-void release_vt(vt_t*, int);
+void vt_get_current(int*);
+CLEANUP int vt_lock_switch(int);
 
-void lock_vt_switch();
-void unlock_vt_switch();
+void vt_acquire(vt_t*);
+void vt_reopen(vt_t*);
+CLEANUP int vt_release(vt_t*, int);
 
-void secure_vt(vt_t*);
-void tty_echo_on(vt_t*);
-void tty_echo_off(vt_t*);
-void flush_vt(vt_t*);
-void reset_vt(vt_t*);
+void vt_secure(vt_t*);
+void vt_flush(vt_t*);
+CLEANUP void vt_reset(vt_t*);
 
 #endif /* VT_H */
