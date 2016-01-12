@@ -90,7 +90,7 @@ void prompt(FILE *stream, const char *fmt, ...) {
 }
 
 int main(int argc, char **argv) {
-	int try = 0, unauth = 1, user_only = 1;
+	int unauth = 1, user_only = 1;
 	userinfo_t root, user, *u = &user;
 
 	oldvt = oldsysrq = oldprintk = vt.nr = vt.fd = -1;
@@ -169,10 +169,6 @@ int main(int argc, char **argv) {
 		unauth = authenticate(u, buf);
 		memset(buf, 0, sizeof(buf));
 		if (unauth) {
-			if (!user_only && (u == &root || ++try == 3)) {
-				u = u == &root ? &user : &root;
-				try = 0;
-			}
 			fprintf(vt.ios, "\nAuthentication failed\n\n");
 			syslog(LOG_WARNING, "Authentication failure");
 			sleep(AUTH_FAIL_TIMEOUT);
